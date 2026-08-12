@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Plateforme ETFP – Gestion du Personnel</title>
+
+<!-- PWA : installation sur téléphone et PC -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d2137">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MEPUA">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-180.png">
+
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script>
 /* ============================================================
@@ -9384,4 +9395,51 @@ edtSaveCreneau = function() {
   }
   _edtSaveOrig();
 };
+</script>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  PWA : ENREGISTREMENT DU SERVICE WORKER + BOUTON INSTALLER -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<script>
+(function() {
+  // Enregistrement du service worker (permet l'installation + un chargement hors-ligne basique)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('service-worker.js').catch(function(err) {
+        console.warn('Service worker non enregistré :', err);
+      });
+    });
+  }
+
+  // Bouton d'installation flottant (Android / Chrome desktop)
+  var deferredPrompt = null;
+  var installBtn = null;
+
+  function createInstallButton() {
+    if (installBtn) return installBtn;
+    installBtn = document.createElement('button');
+    installBtn.textContent = '⬇️ Installer l\'application';
+    installBtn.style.cssText = 'position:fixed;bottom:18px;right:18px;z-index:99998;background:#0d2137;color:#fff;border:none;padding:12px 18px;border-radius:999px;font-family:sans-serif;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:none;';
+    installBtn.addEventListener('click', function() {
+      installBtn.style.display = 'none';
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.finally(function() { deferredPrompt = null; });
+    });
+    document.body.appendChild(installBtn);
+    return installBtn;
+  }
+
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    var btn = createInstallButton();
+    btn.style.display = 'block';
+  });
+
+  window.addEventListener('appinstalled', function() {
+    if (installBtn) installBtn.style.display = 'none';
+    deferredPrompt = null;
+  });
+})();
 </script>
