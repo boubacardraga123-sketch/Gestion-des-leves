@@ -9405,7 +9405,7 @@ edtSaveCreneau = function() {
   // Enregistrement du service worker (permet l'installation + un chargement hors-ligne basique)
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-      navigator.serviceWorker.register('service-worker.js').catch(function(err) {
+      navigator.serviceWorker.register('sw.js').catch(function(err) {
         console.warn('Service worker non enregistré :', err);
       });
     });
