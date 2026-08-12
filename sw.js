@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mepua-cache-v1';
+const CACHE_NAME = 'mepua-cache-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -28,17 +28,20 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
 
+  // Ne jamais intercepter Firestore/Firebase : données toujours fraîches si en ligne.
   if (req.url.includes('firestore.googleapis.com') || req.url.includes('firebaseio.com')) {
     return;
   }
 
+  // Uniquement les requêtes GET du même site.
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) {
     return;
   }
 
+  // Cache d'abord (chargement instantané hors-ligne), mise à jour en arrière-plan.
   event.respondWith(
     caches.match(req).then((cached) => {
-      const network = fetch(req)
+      const networkFetch = fetch(req)
         .then((res) => {
           if (res && res.status === 200) {
             const clone = res.clone();
@@ -47,7 +50,8 @@ self.addEventListener('fetch', (event) => {
           return res;
         })
         .catch(() => cached);
-      return cached || network;
+
+      return cached || networkFetch;
     })
   );
 });
