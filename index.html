@@ -89,7 +89,7 @@
     'ge_etudiants', 'ge_presences', 'ge_notes', 'ge_config',
     'ge_matieres', 'ge_matieres_primaire', 'ge_periode_labels', 'ge_annuel_label',
     'ge_options', 'ge_coefficients', 'ge_matieres_par_option', 'ge_coefficients_par_option',
-    'ge_promo_plan', 'ge_promo_seuil', 'guinee_logo'
+    'ge_promo_plan', 'ge_promo_seuil', 'guinee_logo', 'mepua_etablissement'
   ];
   function isTracked(key) {
     return TRACKED_KEYS.indexOf(key) !== -1 || (key && key.indexOf('ge_archive__') === 0);
@@ -1702,6 +1702,11 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- SAUVEGARDE ÉTABLISSEMENT / DIRECTEUR -->
+    <div style="margin-bottom:28px;display:flex;justify-content:flex-end" class="no-print">
+      <button class="btn btn-gold" onclick="mepuaSaveEtablissement()" style="font-size:14px;padding:12px 22px">💾 Enregistrer les informations de l'établissement</button>
     </div>
 
     <!-- CONFIGURATION COMBINÉE -->
@@ -3462,6 +3467,7 @@ function showTab(id) {
               </div>
               <div style="display:flex;gap:8px;" class="ge-print-hide">
                 <button class="ge-btn ge-btn-ghost" onclick="geFicheImprimer()">🖨️ Imprimer</button>
+                <button class="ge-btn ge-btn-ghost" onclick="geFichePDF(this)">📥 Télécharger en PDF</button>
               </div>
             </div>
             <!-- Sélecteur élève -->
@@ -6882,6 +6888,67 @@ function geFicheRender() {
   </div>`;
 }
 
+async function geFichePDF(btn) {
+  const zone = document.getElementById('ge-fiche-print-zone');
+  if (!zone) { alert('Sélectionnez d\'abord un élève.'); return; }
+
+  const mat = document.getElementById('ge-fiche-select')?.value;
+  const e = geEtudiants.find(x => x.matricule === mat);
+  const nomFichier = e ? `Fiche_${(e.nom||'').replace(/\s+/g,'_')}_${(e.prenom||'').replace(/\s+/g,'_')}.pdf` : 'Fiche_Eleve.pdf';
+
+  const oldText = btn ? btn.innerHTML : null;
+  if (btn) { btn.innerHTML = '⏳ Génération…'; btn.disabled = true; }
+
+  try {
+    if (typeof window.jspdf === 'undefined' || typeof html2canvas === 'undefined') {
+      alert('⚠️ Génération PDF indisponible (librairie non chargée). Utilisez "Imprimer" puis "Enregistrer en PDF".');
+      return;
+    }
+    const { jsPDF } = window.jspdf;
+
+    const canvas = await html2canvas(zone, {
+      scale: 2.5,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = 210, pageH = 297, margin = 8;
+    const contentW = pageW - margin * 2;
+    const contentH = pageH - margin * 2;
+
+    const pxPerMm = canvas.width / contentW;
+    const sliceH_px = contentH * pxPerMm;
+    const totalPages = Math.max(1, Math.ceil(canvas.height / sliceH_px));
+
+    for (let i = 0; i < totalPages; i++) {
+      if (i > 0) pdf.addPage();
+      const sy = i * sliceH_px;
+      const sh = Math.min(sliceH_px, canvas.height - sy);
+
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = canvas.width;
+      sliceCanvas.height = sh;
+      const ctx = sliceCanvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+      ctx.drawImage(canvas, 0, sy, canvas.width, sh, 0, 0, canvas.width, sh);
+
+      const imgData = sliceCanvas.toDataURL('image/jpeg', 0.95);
+      const imgH_mm = sh / pxPerMm;
+      pdf.addImage(imgData, 'JPEG', margin, margin, contentW, imgH_mm);
+    }
+
+    pdf.save(nomFichier);
+  } catch (err) {
+    console.error(err);
+    alert('⚠️ Échec de la génération du PDF.');
+  } finally {
+    if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
+  }
+}
+
 function geFicheImprimer() {
   const zone = document.getElementById('ge-fiche-print-zone');
   if (!zone) { alert('Sélectionnez d\'abord un élève.'); return; }
@@ -7204,6 +7271,40 @@ function gePrintTousBulletins() {
   w.document.close();
   w.onload = () => { w.focus(); w.print(); w.close(); };
 }
+
+// ── MEPUA : INFOS ÉTABLISSEMENT / DIRECTEUR ─────────────────
+var MEPUA_ETAB_FIELDS = [
+  'etab-nom','etab-sigle','etab-code','etab-type','etab-niveau','etab-region','etab-dept',
+  'etab-adresse','etab-bp','etab-tel','etab-email','etab-web','etab-annee','etab-arrete',
+  'etab-cap','etab-salles',
+  'dir-nom','dir-mat','dir-grade','dir-spe','dir-date','dir-tel','dir-email','dir-diplome',
+  'dir-etab-diplome','dir-exp','dir-sig'
+];
+function mepuaSaveEtablissement(){
+  var data = {};
+  MEPUA_ETAB_FIELDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) data[id] = el.value;
+  });
+  try{
+    localStorage.setItem('mepua_etablissement', JSON.stringify(data));
+    alert('✅ Informations de l\'établissement enregistrées !');
+  }catch(err){
+    alert('⚠️ Échec de l\'enregistrement local.');
+  }
+}
+function mepuaLoadEtablissement(){
+  try{
+    var raw = localStorage.getItem('mepua_etablissement');
+    if(!raw) return;
+    var data = JSON.parse(raw);
+    MEPUA_ETAB_FIELDS.forEach(function(id){
+      var el = document.getElementById(id);
+      if(el && data[id] !== undefined) el.value = data[id];
+    });
+  }catch(err){}
+}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',mepuaLoadEtablissement);}else{mepuaLoadEtablissement();}
 
 // ── GE CONFIGURATION ───────────────────────────────────────
 function geSaveConfig(){
