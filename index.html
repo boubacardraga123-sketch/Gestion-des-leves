@@ -89,7 +89,8 @@
     'ge_etudiants', 'ge_presences', 'ge_notes', 'ge_config',
     'ge_matieres', 'ge_matieres_primaire', 'ge_periode_labels', 'ge_annuel_label',
     'ge_options', 'ge_coefficients', 'ge_matieres_par_option', 'ge_coefficients_par_option',
-    'ge_promo_plan', 'ge_promo_seuil', 'guinee_logo', 'mepua_etablissement'
+    'ge_promo_plan', 'ge_promo_seuil', 'guinee_logo', 'mepua_etablissement',
+    'logo_left_img', 'logo_right_img'
   ];
   function isTracked(key) {
     return TRACKED_KEYS.indexOf(key) !== -1 || (key && key.indexOf('ge_archive__') === 0);
@@ -1546,6 +1547,7 @@
       <input type="file" id="logo-right-input" accept="image/*" style="display:none" onchange="loadLogo('right', this)">
     </div>
     <div class="header-actions no-print">
+      <button class="btn btn-outline" onclick="saveLogos()" title="Enregistrer les deux logos de façon permanente">💾 Enregistrer les logos</button>
       <button class="btn btn-outline" onclick="openPwdModal()" title="Changer le mot de passe">🔑 Mot de passe</button>
     </div>
   </div>
@@ -7954,6 +7956,49 @@ function loadLogo(side, input) {
   };
   reader.readAsDataURL(file);
 }
+
+// Enregistre les deux logos (gauche et droit) de façon permanente :
+// ils sont écrits dans localStorage (donc synchronisés automatiquement
+// vers le cloud) et seront ré-appliqués tout seuls à chaque ouverture.
+function saveLogos() {
+  const imgL = document.getElementById('logo-left-img');
+  const imgR = document.getElementById('logo-right-img');
+  const hasL = imgL && imgL.style.display !== 'none' && imgL.src;
+  const hasR = imgR && imgR.style.display !== 'none' && imgR.src;
+
+  if (!hasL && !hasR) {
+    alert('Ajoutez au moins un logo (clic sur les cases 🏛️ ou 🏫) avant d\'enregistrer.');
+    return;
+  }
+  if (hasL) localStorage.setItem('logo_left_img', imgL.src); else localStorage.removeItem('logo_left_img');
+  if (hasR) localStorage.setItem('logo_right_img', imgR.src); else localStorage.removeItem('logo_right_img');
+
+  alert('✅ Logos enregistrés. Ils seront chargés automatiquement à chaque ouverture de l\'application.');
+}
+
+// Applique un logo sauvegardé (gauche ou droit) dans les cases du header
+// et dans le bloc d'impression correspondant.
+function applySavedLogo(side, data) {
+  const img = document.getElementById('logo-' + side + '-img');
+  const placeholder = document.getElementById('logo-' + side + '-placeholder');
+  const phBox = document.getElementById('ph-logo-' + side);
+  if (img && placeholder) {
+    img.src = data;
+    img.style.display = 'block';
+    placeholder.style.display = 'none';
+  }
+  if (phBox) phBox.innerHTML = '<img src="' + data + '" style="width:100%;height:100%;object-fit:contain;">';
+}
+
+// Au chargement de la page, on restaure les logos précédemment enregistrés.
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    const savedL = localStorage.getItem('logo_left_img');
+    const savedR = localStorage.getItem('logo_right_img');
+    if (savedL) applySavedLogo('left', savedL);
+    if (savedR) applySavedLogo('right', savedR);
+  } catch (e) {}
+});
 
 // Synchronise le nom de l'établissement vers le bloc d'impression
 function syncPrintHeader() {
