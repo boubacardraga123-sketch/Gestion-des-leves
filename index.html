@@ -169,7 +169,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js"></script>
 <style>
   :root {
     --navy: #0d2137;
@@ -1524,6 +1524,7 @@
 <div id="excel-menu" class="excel-menu" style="display:none;">
   <div class="excel-menu-title">📊 Exporter vers Excel</div>
   <button onclick="exportExcelElevesByClasse();closeExcelMenu()">👥 Liste des élèves par classe</button>
+  <button onclick="exportExcelElevesSimpleByClasse();closeExcelMenu()">📋 Liste des élèves par classe (sans notes)</button>
   <button onclick="exportExcelResultatsByClasse();closeExcelMenu()">📝 Résultats & notes par classe</button>
   <button onclick="exportExcelAdmisByClasse();closeExcelMenu()">🏆 Liste des admis par classe</button>
   <button onclick="exportExcelPersonnel();closeExcelMenu()">👨‍🏫 Liste du personnel</button>
@@ -6744,10 +6745,10 @@ function geFicheRender() {
 
     <!-- ══ EN-TÊTE ══ -->
     <div style="background:linear-gradient(135deg,#0d2137 0%,#163352 100%);border-radius:14px 14px 0 0;padding:18px 26px;display:flex;align-items:center;gap:18px;">
-      ${e.photo
-        ? `<img src="${e.photo}" alt="Photo" style="width:70px;height:70px;border-radius:50%;object-fit:cover;border:3px solid #c9922a;flex-shrink:0;box-shadow:0 4px 16px rgba(0,0,0,.4);">`
-        : `<div style="width:70px;height:70px;background:rgba(201,146,42,.15);border:2px solid #c9922a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">${e.sexe==='F'?'👩‍🎓':'👨‍🎓'}</div>`
-      }
+      <div style="flex-shrink:0;text-align:left;">
+        <div style="font-size:11px;font-weight:700;color:#e8b84b;letter-spacing:.03em;">IRE : Mamou</div>
+        <div style="font-size:11px;font-weight:700;color:#e8b84b;letter-spacing:.03em;margin-top:2px;">DPE : Mamou</div>
+      </div>
       <div style="flex:1;text-align:center;">
         <div style="font-size:16px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#e8b84b;">République de Guinée</div>
         <div style="font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:white;margin-top:4px;">${etablissement}</div>
@@ -7099,10 +7100,10 @@ function geBulletinHTML(e, periodeVal) {
   ">
     <!-- EN-TÊTE -->
     <div style="background:linear-gradient(135deg,#0d2137 0%,#163352 100%);padding:16px 22px;display:flex;align-items:center;gap:16px;">
-      ${e.photo
-        ? `<img src="${e.photo}" alt="Photo" style="width:62px;height:62px;border-radius:50%;object-fit:cover;border:2.5px solid #c9922a;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,.5);">`
-        : `<div style="width:56px;height:56px;background:rgba(201,146,42,.18);border:2px solid #c9922a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${e.sexe==='F'?'👩‍🎓':'👨‍🎓'}</div>`
-      }
+      <div style="flex-shrink:0;text-align:left;">
+        <div style="font-size:11px;font-weight:700;color:#e8b84b;letter-spacing:.03em;">IRE : Mamou</div>
+        <div style="font-size:11px;font-weight:700;color:#e8b84b;letter-spacing:.03em;margin-top:2px;">DPE : Mamou</div>
+      </div>
       <div style="flex:1;text-align:center;">
         <div style="font-size:16px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#e8b84b;">République de Guinée</div>
         <div style="font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:white;margin-top:4px;">${etablissement}</div>
@@ -7492,6 +7493,66 @@ function exportExcelElevesByClasse() {
   } catch(err) { showToast('❌ Erreur export : ' + err.message); console.error(err); }
 }
 
+/* ── 1bis. Liste des élèves par classe SANS notes/statistiques d'admission ── */
+function exportExcelElevesSimpleByClasse() {
+  if (!geEtudiants.length) { showToast('⚠️ Aucun élève à exporter.'); return; }
+  try {
+  const wb = XLSX.utils.book_new();
+  const annee = (document.getElementById('ge-cfg-annee') || {}).value || new Date().getFullYear();
+  const nbCols = 11;
+
+  // Regrouper par classe
+  const parClasse = {};
+  geEtudiants.forEach(e => {
+    const cl = (e.classe || 'Non définie').trim();
+    if (!parClasse[cl]) parClasse[cl] = [];
+    parClasse[cl].push(e);
+  });
+
+  Object.keys(parClasse).sort().forEach(classe => {
+    const eleves = parClasse[classe];
+    const { rows, merges } = _getEnteteExcelRows(`Liste des Élèves — Classe : ${classe}  (Effectif : ${eleves.length})`, nbCols);
+
+    // En-tête colonnes
+    rows.push(['N°','Matricule','Nom','Prénom','Sexe','Date Naiss.','Lieu Naiss.','Option','Statut','Tuteur','Tél. Tuteur']);
+    // Données
+    eleves.forEach((e, i) => {
+      rows.push([i+1, e.matricule||'', e.nom||'', e.prenom||'', e.sexe||'', e.dob||'', e.lieu||'', e.option||'', e.statut||'', e.tuteur||'', e.telTuteur||'']);
+    });
+
+    // Simple récap effectif (garçons/filles/total) — sans moyennes ni admis/non admis
+    const garcons = eleves.filter(e => e.sexe==='M').length;
+    const filles  = eleves.filter(e => e.sexe==='F').length;
+    const total   = eleves.length;
+    rows.push([]);
+    rows.push(['Effectif total',garcons,filles,total,'','','','','','','']);
+
+    const sheetName = classe.replace(/[:\\\/\?\*\[\]]/g,'').substring(0,31);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [4,14,16,16,6,12,14,14,10,16,14].map(w=>({wch:w}));
+    ws['!merges'] = merges;
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  });
+
+  // Feuille synthèse
+  const nbColsSynth = 4;
+  const { rows: synthRows, merges: synthMerges } = _getEnteteExcelRows('Synthèse des Effectifs par Classe', nbColsSynth);
+  synthRows.push(['Classe','Effectif Total','Garçons','Filles']);
+  Object.keys(parClasse).sort().forEach(cl => {
+    const el = parClasse[cl];
+    synthRows.push([cl, el.length, el.filter(e=>e.sexe==='M').length, el.filter(e=>e.sexe==='F').length]);
+  });
+  synthRows.push([]);
+  synthRows.push(['TOTAL', geEtudiants.length, geEtudiants.filter(e=>e.sexe==='M').length, geEtudiants.filter(e=>e.sexe==='F').length]);
+  const wsSynth = XLSX.utils.aoa_to_sheet(synthRows);
+  wsSynth['!cols'] = [{wch:20},{wch:14},{wch:12},{wch:12}];
+  wsSynth['!merges'] = synthMerges;
+  XLSX.utils.book_append_sheet(wb, wsSynth, 'Synthèse');
+
+  _xlsxDownload(wb, `Liste_Eleves_SansNotes_${annee}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  } catch(err) { showToast('❌ Erreur export : ' + err.message); console.error(err); }
+}
+
 /* ── 2. Résultats par classe (notes + moyennes) ── */
 function exportExcelResultatsByClasse() {
   if (!geEtudiants.length) { showToast('⚠️ Aucun élève à exporter.'); return; }
@@ -7749,13 +7810,17 @@ function _getEnteteExcelRows(titre, nbCols) {
   const etab  = (document.querySelector('.header-title h1') || {}).textContent || 'ETFP';
   const annee = (document.getElementById('ge-cfg-annee') || {}).value || '';
   const date  = new Date().toLocaleDateString('fr-GN');
+  const centre = (txt) => ({ v: txt, s: { alignment: { horizontal: 'center', vertical: 'center' } } });
+  const gauche = (txt) => ({ v: txt, s: { alignment: { horizontal: 'left', vertical: 'center' } } });
   const rows  = [];
-  rows.push([`République de Guinée`]);
-  rows.push([`Travail · Justice · Solidarité`]);
-  rows.push([etab]);
-  if (annee) rows.push([`Année scolaire : ${annee}`]);
-  rows.push([titre]);
-  rows.push([`Édité le : ${date}`]);
+  rows.push([centre(`République de Guinée`)]);
+  rows.push([centre(`Travail · Justice · Solidarité`)]);
+  rows.push([gauche(`IRE : Mamou`)]);
+  rows.push([gauche(`DPE : Mamou`)]);
+  rows.push([gauche(etab)]);
+  if (annee) rows.push([gauche(`Année scolaire : ${annee}`)]);
+  rows.push([gauche(titre)]);
+  rows.push([gauche(`Édité le : ${date}`)]);
   rows.push([]); // ligne vide avant les données
   const merges = [];
   for (let r = 0; r < rows.length - 1; r++) {
